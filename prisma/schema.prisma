@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model InventoryItem {
+  id            Int           @id @default(autoincrement())
+  productCode   String        @unique
+  medicineName  String
+  unit          String
+  unitQuantity  Float         @default(0)
+  gst           Float
+  basicPrice    Float
+  mrp           Float
+  quantity      Float
+  minQuantity   Float         @default(5)
+  batchNumber   String        @default("")
+  ounce         Float?
+  expiry        DateTime
+  itemPosition  String
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  history       ItemHistory[]
+}
+
+model ItemHistory {
+  id          Int           @id @default(autoincrement())
+  itemId      Int
+  action      String
+  changes     String
+  performedAt DateTime      @default(now())
+  item        InventoryItem @relation(fields: [itemId], references: [id])
+}
+
+model EmailQueue {
+  id          Int       @id @default(autoincrement())
+  recipient   String
+  subject     String
+  body        String
+  status      String    @default("pending")
+  createdAt   DateTime  @default(now())
+  sentAt      DateTime?
+}
+
+model Bill {
+  id                 Int        @id @default(autoincrement())
+  billNumber         String     @unique
+  customerName       String
+  customerPhone      String     @default("")
+  paymentMode        String     @default("CASH")
+  doctorName         String     @default("")
+  prescriptionNumber String     @default("")
+  subtotal           Float
+  totalGST           Float
+  totalAmount        Float
+  notes              String     @default("")
+  createdAt          DateTime   @default(now())
+  items              BillItem[]
+}
+
+model BillItem {
+  id            Int    @id @default(autoincrement())
+  billId        Int
+  productCode   String
+  medicineName  String
+  unit          String
+  unitQuantity  Float
+  batchNumber   String @default("")
+  mrp           Float
+  gst           Float
+  quantity      Float
+  ouncesSold    Float  @default(0)
+  discount      Float  @default(0)
+  totalAmount   Float
+  bill          Bill   @relation(fields: [billId], references: [id])
+}
+
+model Supplier {
+  id        Int        @id @default(autoincrement())
+  name      String
+  phone     String     @default("")
+  email     String     @default("")
+  address   String     @default("")
+  gstin     String     @default("")
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  purchases Purchase[]
+}
+
+model Purchase {
+  id             Int            @id @default(autoincrement())
+  purchaseNumber String         @unique
+  supplierId     Int
+  supplierName   String
+  invoiceNumber  String         @default("")
+  invoiceDate    DateTime
+  totalAmount    Float
+  notes          String         @default("")
+  createdAt      DateTime       @default(now())
+  supplier       Supplier       @relation(fields: [supplierId], references: [id])
+  items          PurchaseItem[]
+}
+
+model PurchaseItem {
+  id           Int      @id @default(autoincrement())
+  purchaseId   Int
+  productCode  String
+  medicineName String
+  unit         String
+  unitQuantity Float
+  batchNumber  String   @default("")
+  expiry       DateTime
+  quantity     Float
+  costPrice    Float
+  totalAmount  Float
+  purchase     Purchase @relation(fields: [purchaseId], references: [id])
+}
