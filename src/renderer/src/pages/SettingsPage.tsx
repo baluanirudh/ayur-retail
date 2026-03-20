@@ -1,8 +1,56 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export default function SettingsPage() {
   const [backupStatus, setBackupStatus] = useState('')
   const [restoreStatus, setRestoreStatus] = useState('')
+  const [currentPin, setCurrentPin] = useState('')
+  const [newPin, setNewPin] = useState('')
+  const [confirmPin, setConfirmPin] = useState('')
+  const [pinStatus, setPinStatus] = useState('')
+  const [hasPin, setHasPin] = useState(false)
+
+  useEffect(() => {
+    window.api.auth.getPin().then((pin: string | null) => {
+      setHasPin(!!pin)
+    })
+  }, [])
+
+  async function handleSetPin() {
+    if (newPin.length < 4) {
+      setPinStatus('PIN must be at least 4 digits')
+      return
+    }
+    if (newPin !== confirmPin) {
+      setPinStatus('PINs do not match')
+      return
+    }
+    if (hasPin) {
+      const correct = await window.api.auth.verifyPin(currentPin)
+      if (!correct) {
+        setPinStatus('Current PIN is incorrect')
+        return
+      }
+    }
+    await window.api.auth.setPin(newPin)
+    setHasPin(true)
+    setCurrentPin('')
+    setNewPin('')
+    setConfirmPin('')
+    setPinStatus('✓ PIN set successfully')
+  }
+
+  async function handleRemovePin() {
+    if (!confirm('Remove PIN? App will be accessible without PIN.')) return
+    const correct = await window.api.auth.verifyPin(currentPin)
+    if (!correct) {
+      setPinStatus('Current PIN is incorrect')
+      return
+    }
+    await window.api.auth.removePin()
+    setHasPin(false)
+    setCurrentPin('')
+    setPinStatus('✓ PIN removed')
+  }
 
   async function handleBackup() {
     setBackupStatus('Creating backup...')
@@ -72,6 +120,71 @@ export default function SettingsPage() {
               {restoreStatus}
             </p>
           )}
+        </div>
+
+        {/* App Lock */}
+        <div className="bg-white rounded-xl shadow p-6">
+          <h2 className="text-lg font-bold text-green-700 mb-1">App Lock</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            {hasPin
+              ? 'App is currently locked with a PIN. Enter current PIN to change or remove it.'
+              : 'Set a PIN to prevent unauthorized access to the app.'}
+          </p>
+          <div className="space-y-3 max-w-xs">
+            {hasPin && (
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Current PIN</label>
+                <input
+                  type="password"
+                  value={currentPin}
+                  onChange={e => setCurrentPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="Enter current PIN"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                />
+              </div>
+            )}
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">New PIN (min 4 digits)</label>
+              <input
+                type="password"
+                value={newPin}
+                onChange={e => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="Enter new PIN"
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Confirm New PIN</label>
+              <input
+                type="password"
+                value={confirmPin}
+                onChange={e => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="Confirm new PIN"
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleSetPin}
+                className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition"
+              >
+                {hasPin ? '🔒 Update PIN' : '🔒 Set PIN'}
+              </button>
+              {hasPin && (
+                <button
+                  onClick={handleRemovePin}
+                  className="flex-1 bg-red-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-600 transition"
+                >
+                  🔓 Remove PIN
+                </button>
+              )}
+            </div>
+            {pinStatus && (
+              <p className={`text-sm ${pinStatus.startsWith('✓') ? 'text-green-600' : 'text-red-500'}`}>
+                {pinStatus}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* App Info */}

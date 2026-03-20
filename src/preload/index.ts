@@ -31,6 +31,8 @@ const api = {
     stockMovement: (filters?: object) => ipcRenderer.invoke('reports:stockMovement', filters),
     gst: (filters: object) => ipcRenderer.invoke('reports:gst', filters),
     exportGSTPdf: (data: object) => ipcRenderer.invoke('reports:exportGSTPdf', data),
+    profit: () => ipcRenderer.invoke('reports:profit'),
+    exportProfitPdf: (data: object) => ipcRenderer.invoke('reports:exportProfitPdf', data),
   },
   purchase: {
     getSuppliers: () => ipcRenderer.invoke('purchase:getSuppliers'),
@@ -40,7 +42,15 @@ const api = {
     getAll: () => ipcRenderer.invoke('purchase:getAll'),
     getById: (id: number) => ipcRenderer.invoke('purchase:getById', id),
     delete: (id: number) => ipcRenderer.invoke('purchase:delete', id),
+    exportPdf: (purchaseId: number) => ipcRenderer.invoke('purchase:exportPdf', purchaseId),
   },
+  auth: {
+    getPin: () => ipcRenderer.invoke('auth:getPin'),
+    setPin: (pin: string) => ipcRenderer.invoke('auth:setPin', pin),
+    verifyPin: (pin: string) => ipcRenderer.invoke('auth:verifyPin', pin),
+    removePin: () => ipcRenderer.invoke('auth:removePin'),
+  },
+
   onNetworkStatus: (callback: (isOnline: boolean) => void) => {
     ipcRenderer.on('network-status-changed', (_event, isOnline) => callback(isOnline))
   },

@@ -81,6 +81,15 @@ export default function PurchaseHistoryPage() {
                   <div className="flex items-center gap-4">
                     <p className="font-bold text-green-700">Rs.{purchase.totalAmount.toFixed(2)}</p>
                     <button
+                      onClick={e => {
+                        e.stopPropagation()
+                        window.api.purchase.exportPdf(purchase.id)
+                          .then((f: string) => alert(`Saved: ${f}`))
+                          .catch(() => alert('Failed to export PDF'))
+                      }}
+                      className="text-xs bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700"
+                    >Print</button>
+                    <button
                       onClick={e => { e.stopPropagation(); handleDelete(purchase.id) }}
                       className="text-xs bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600"
                     >Delete</button>
