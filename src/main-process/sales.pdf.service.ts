@@ -3,6 +3,7 @@ import { app } from 'electron'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { getBillById, getDailySalesReport } from './sales.service'
+import prisma from '../lib/db'
 
 const autoTableFn = require('jspdf-autotable').default
 
@@ -314,6 +315,142 @@ export async function exportGSTReportToPDF(report: any, monthName: string, year:
   const outputPath = path.join(
     app.getPath('downloads'),
     `GST_Report_${monthName}_${year}.pdf`
+  )
+  const buffer = Buffer.from(doc.output('arraybuffer'))
+  require('fs').writeFileSync(outputPath, buffer)
+  return outputPath
+}
+
+export async function exportPurchaseOrderToPDF(purchaseId: number): Promise<string> {
+  const purchase = await prisma.purchase.findUnique({
+    where: { id: purchaseId },
+    include: { items: true, supplier: true },
+  })
+  if (!purchase) throw new Error('Purchase not found')
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+
+  // ── Header ──────────────────────────────────────────────
+  doc.setFontSize(9)
+  doc.setTextColor(30)
+  doc.setFont('helvetica', 'normal')
+  doc.text('PURCHASE ORDER', 105, 10, { align: 'center' })
+
+  doc.setFontSize(14)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(22, 101, 52)
+  doc.text('KOTTAKKAL ARYA VAIDYA SALA', 105, 18, { align: 'center' })
+
+  doc.setFontSize(8)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(50)
+  doc.text('Authorised Dealer, Wandoor.', 105, 23, { align: 'center' })
+  doc.text('GST IN: 32EKRPS6948J1Z8  |  Ph: 04931248158', 105, 28, { align: 'center' })
+
+  doc.setDrawColor(22, 101, 52)
+  doc.setLineWidth(0.4)
+  doc.line(15, 31, 195, 31)
+
+  // ── Purchase Info ────────────────────────────────────────
+  doc.setFontSize(8)
+  doc.setTextColor(30)
+  doc.text(`PO Number  : ${purchase.purchaseNumber}`, 15, 38)
+  doc.text(`Date       : ${new Date(purchase.createdAt).toLocaleDateString('en-IN')}`, 15, 44)
+  if (purchase.invoiceNumber) {
+    doc.text(`Invoice No : ${purchase.invoiceNumber}`, 15, 50)
+  }
+
+  // Supplier details on the right
+  doc.text(`Supplier   : ${purchase.supplier.name}`, 105, 38)
+  if (purchase.supplier.phone) {
+    doc.text(`Phone      : ${purchase.supplier.phone}`, 105, 44)
+  }
+  if (purchase.supplier.gstin) {
+    doc.text(`GSTIN      : ${purchase.supplier.gstin}`, 105, 50)
+  }
+  if (purchase.supplier.address) {
+    doc.text(`Address    : ${purchase.supplier.address}`, 105, 56)
+  }
+
+  const tableStartY = purchase.invoiceNumber ? 56 : 50
+
+  doc.setLineWidth(0.2)
+  doc.line(15, tableStartY + 3, 195, tableStartY + 3)
+
+  // ── Items Table ──────────────────────────────────────────
+  autoTableFn(doc, {
+    startY: tableStartY + 6,
+    margin: { left: 15, right: 15 },
+    head: [['No.', 'Product Code', 'Medicine Name', 'Unit', 'Batch No', 'Expiry', 'Qty', 'Cost Price', 'Total']],
+    body: purchase.items.map((item, idx) => [
+      idx + 1,
+      item.productCode,
+      item.medicineName,
+      `${item.unitQuantity}${item.unit}`,
+      item.batchNumber || '-',
+      new Date(item.expiry).toLocaleDateString('en-IN'),
+      item.quantity,
+      `Rs.${item.costPrice.toFixed(2)}`,
+      `Rs.${item.totalAmount.toFixed(2)}`,
+    ]),
+    headStyles: {
+      fillColor: [22, 101, 52],
+      textColor: 255,
+      fontSize: 7,
+      fontStyle: 'bold',
+      cellPadding: 2,
+      halign: 'left',
+    },
+    bodyStyles: { fontSize: 7.5, textColor: 30, cellPadding: 2 },
+    alternateRowStyles: { fillColor: [245, 255, 245] },
+    columnStyles: {
+      0: { cellWidth: 6 },
+      1: { cellWidth: 20 },
+      2: { cellWidth: 55 },
+      3: { cellWidth: 14 },
+      4: { cellWidth: 20 },
+      5: { cellWidth: 20 },
+      6: { cellWidth: 10 },
+      7: { cellWidth: 17 },
+      8: { cellWidth: 18 },
+    },
+    showHead: 'everyPage',
+  })
+
+  const finalY = (doc as any).lastAutoTable.finalY
+
+  // ── Total ────────────────────────────────────────────────
+  doc.setLineWidth(0.3)
+  doc.line(15, finalY + 3, 195, finalY + 3)
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10)
+  doc.setTextColor(22, 101, 52)
+  doc.text('TOTAL AMOUNT :', 130, finalY + 10)
+  doc.text(`Rs.${purchase.totalAmount.toFixed(2)}`, 193, finalY + 10, { align: 'right' })
+
+  doc.setLineWidth(0.3)
+  doc.line(15, finalY + 13, 195, finalY + 13)
+  doc.line(15, finalY + 15, 195, finalY + 15)
+
+  // ── Notes ────────────────────────────────────────────────
+  if (purchase.notes) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7.5)
+    doc.setTextColor(60)
+    doc.text(`Notes: ${purchase.notes}`, 15, finalY + 22)
+  }
+
+  // ── Footer ───────────────────────────────────────────────
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7.5)
+  doc.setTextColor(100)
+  doc.text('Authorised Signatory', 170, finalY + 35, { align: 'right' })
+
+  // ── Save ─────────────────────────────────────────────────
+  const outputPath = path.join(
+    app.getPath('downloads'),
+    `PO_${purchase.purchaseNumber}.pdf`
   )
   const buffer = Buffer.from(doc.output('arraybuffer'))
   require('fs').writeFileSync(outputPath, buffer)
